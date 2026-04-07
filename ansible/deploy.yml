@@ -1,0 +1,87 @@
+---
+- name: Deploy Leave Management System
+  hosts: webservers
+  become: false
+
+  vars:
+    workspace: "/home/Naren/.jenkins/workspace/leave-mgmt-pipeline"
+    backend_dir: "{{ workspace }}/backend"
+    frontend_dir: "{{ workspace }}/frontend"
+
+  tasks:
+
+    # ── Backend ────────────────────────────────────────────────────
+
+    - name: Stop existing backend
+      shell: pkill -f "node server.js" || true
+
+    - name: Wait for port 5000 to free
+      wait_for:
+        port: 5000
+        state: stopped
+        timeout: 10
+      ignore_errors: true
+
+    - name: Write backend .env file
+      copy:
+        dest: "{{ backend_dir }}/.env"
+        content: |
+          PORT=5000
+          NODE_ENV=production
+          MONGO_URI=mongodb+srv://naren:naren123@cluster0.t2luovz.mongodb.net/leave_mgmt?retryWrites=true&w=majority&appName=Cluster0
+          JWT_SECRET=leavemgmt_super_secret_key_2024
+          JWT_EXPIRES_IN=7d
+          CORS_ORIGIN=http://20.207.65.215:3000
+
+    - name: Install backend dependencies
+      shell: npm install --production
+      args:
+        chdir: "{{ backend_dir }}"
+
+    - name: Start backend server
+      shell: nohup node server.js > app.log 2>&1 &
+      args:
+        chdir: "{{ backend_dir }}"
+
+    - name: Wait for backend to start
+      wait_for:
+        port: 5000
+        timeout: 30
+
+    - name: Verify backend health
+      uri:
+        url: http://localhost:5000/api/v1/health
+        return_content: yes
+      register: health_check
+
+    - name: Show backend status
+      debug:
+        msg: "Backend status: {{ health_check.json.message }}"
+
+    # ── Frontend ───────────────────────────────────────────────────
+
+    - name: Stop existing frontend
+      shell: pkill -f "serve -s build" || true
+
+    - name: Wait for port 3000 to free
+      wait_for:
+        port: 3000
+        state: stopped
+        timeout: 10
+      ignore_errors: true
+
+    - name: Start frontend server
+      shell: nohup serve -s build -l 3000 > frontend.log 2>&1 &
+      args:
+        chdir: "{{ frontend_dir }}"
+
+    - name: Wait for frontend to start
+      wait_for:
+        port: 3000
+        timeout: 30
+
+    - name: Deployment complete
+      debug:
+        msg:
+          - "✅ Frontend → http://20.207.65.215:3000"
+          - "✅ Backend  → http://20.207.65.215:5000/api/v1/health"

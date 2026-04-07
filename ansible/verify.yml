@@ -1,0 +1,29 @@
+---
+- name: Verify Deployment
+  hosts: webservers
+  become: false
+
+  tasks:
+
+    - name: Check backend health
+      uri:
+        url: http://localhost:5000/api/v1/health
+        return_content: yes
+      register: backend
+
+    - name: Check frontend is serving
+      uri:
+        url: http://localhost:3000
+        return_content: yes
+      register: frontend
+
+    - name: Check MongoDB connection (via backend log)
+      shell: grep "MongoDB Connected" /home/Naren/.jenkins/workspace/leave-mgmt-pipeline/backend/app.log | tail -1
+      register: mongo
+
+    - name: Print results
+      debug:
+        msg:
+          - "Backend: {{ backend.json.message }}"
+          - "Frontend: HTTP {{ frontend.status }}"
+          - "Database: {{ mongo.stdout }}"

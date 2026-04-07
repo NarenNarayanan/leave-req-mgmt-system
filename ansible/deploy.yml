@@ -10,10 +10,9 @@
 
   tasks:
 
-    # ── Backend ────────────────────────────────────────────────────
-
     - name: Stop existing backend
-      shell: pkill -f "node server.js" || true
+      shell: pkill -f "node server.js" || exit 0
+      ignore_errors: true
 
     - name: Wait for port 5000 to free
       wait_for:
@@ -33,11 +32,6 @@
           JWT_EXPIRES_IN=7d
           CORS_ORIGIN=http://20.207.65.215:3000
 
-    - name: Install backend dependencies
-      shell: npm install --production
-      args:
-        chdir: "{{ backend_dir }}"
-
     - name: Start backend server
       shell: nohup node server.js > app.log 2>&1 &
       args:
@@ -56,12 +50,11 @@
 
     - name: Show backend status
       debug:
-        msg: "Backend status: {{ health_check.json.message }}"
-
-    # ── Frontend ───────────────────────────────────────────────────
+        msg: "Backend: {{ health_check.json.message }}"
 
     - name: Stop existing frontend
-      shell: pkill -f "serve -s build" || true
+      shell: pkill -f "serve -s build" || exit 0
+      ignore_errors: true
 
     - name: Wait for port 3000 to free
       wait_for:
@@ -80,7 +73,7 @@
         port: 3000
         timeout: 30
 
-    - name: Deployment complete
+    - name: Deployment summary
       debug:
         msg:
           - "✅ Frontend → http://20.207.65.215:3000"
